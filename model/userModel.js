@@ -1,4 +1,3 @@
-const { boolean } = require("@tma.js/sdk");
 const { model, Schema } = require("mongoose");
 
 const userSchema = new Schema(
