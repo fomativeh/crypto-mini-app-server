@@ -46,7 +46,7 @@ bot.start(async (ctx) => {
       }
     );
   } catch (error) {
-    console.log(error)
+    console.log(error);
   }
 });
 
@@ -76,8 +76,8 @@ bot.command("welcometest", (ctx) => {
   ctx.reply(link("Launch", process.env.DIRECT_LINK));
 });
 
-bot.on('message', (ctx) => {
-  console.log(ctx)
+bot.on("message", (ctx) => {
+  console.log(ctx);
   if (ctx.update.message.web_app_data) {
     const data = JSON.parse(ctx.update.message.web_app_data);
     console.log(`Received data from Mini App:\n ${data}`); // Replace "yourData" with the actual key
@@ -100,6 +100,31 @@ bot.telegram.setMyCommands([
 
 app.get("/", (req, res) => {
   res.send("Hello-world");
+});
+
+app.get("/user/id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findOne({ telegram_id: id });
+
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    res.status(500).json({ success: false, error });
+  }
+});
+
+app.patch("/user/id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateDetails = req.body
+
+    await User.updateOne({ telegram_id: id }, { $set: updateDetails });
+    
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error });
+  }
 });
 
 const port = process.env.PORT;
