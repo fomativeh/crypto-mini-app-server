@@ -7,6 +7,13 @@ const User = require("./model/userModel");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const app = express();
+const Queue = require("queue-promise");
+
+// Create a queue instance
+const queue = new Queue({
+  concurrent: 25, // Process one request at a time
+  interval: 3000, // Interval between dequeue operations (1 second)
+});
 
 app.use(
   cors({
@@ -27,77 +34,81 @@ app.get("/", (req, res) => {
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 bot.start(async (ctx) => {
-  const { username, id } = ctx.from;
-  try {
-    //check if user already exists
+  queue.enqueue(async () => {
+    const { username, id } = ctx.from;
+    try {
+      //check if user already exists
 
-    const userExists = await User.findOne({ telegram_id: id });
+      const userExists = await User.findOne({ telegram_id: id });
 
-    if (!userExists) {
-      const newUser = new User({ telegram_id: id });
-      await newUser.save();
+      if (!userExists) {
+        const newUser = new User({ telegram_id: id });
+        await newUser.save();
+      }
+
+      const initData = JSON.stringify({ telegram_id: id });
+
+      ctx.telegram.sendMessage(
+        ctx.chat.id,
+        `Hey, @${username}\nWelcome to @crypto\nPlease click the button below to follow our socials.`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "Join our socials.",
+                  web_app: {
+                    url: process.env.FRONTEND_URL,
+                    initData: initData,
+                  },
+                },
+              ],
+            ],
+          },
+        }
+      );
+    } catch (error) {
+      console.log(error);
     }
+  });
+});
 
-    const initData = JSON.stringify({ telegram_id: id });
+// Listen for new chat members
+bot.on("new_chat_members", (ctx) => {
+  queue.enqueue(async () => {
+    const newUser = ctx.message.new_chat_members[0];
+    const username = newUser.username;
 
-    ctx.telegram.sendMessage(
-      ctx.chat.id,
-      `Hey, @${username}\nWelcome to @crypto\nPlease click the button below to follow our socials.`,
+    ctx.reply(
+      `Hey @${username}👋\nWelcome to the group!\nPlease click the link below to follow our socials`,
       {
         reply_markup: {
           inline_keyboard: [
             [
               {
                 text: "Join our socials.",
-                web_app: {
-                  url: process.env.FRONTEND_URL,
-                  initData: initData,
-                },
+                url: process.env.DIRECT_LINK,
               },
             ],
           ],
         },
       }
     );
-  } catch (error) {
-    console.log(error);
-  }
-});
-
-// Listen for new chat members
-bot.on("new_chat_members", (ctx) => {
-  const newUser = ctx.message.new_chat_members[0];
-  const username = newUser.username;
-
-  ctx.reply(
-    `Hey @${username}👋\nWelcome to the group!\nPlease click the link below to follow our socials`,
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "Join our socials.",
-              url: process.env.DIRECT_LINK,
-            },
-          ],
-        ],
-      },
-    }
-  );
+  });
 });
 
 bot.command("welcometest", (ctx) => {
   ctx.reply(link("Launch", process.env.DIRECT_LINK));
 });
 
-bot.on("message", (ctx) => {
-  console.log(ctx);
-  if (ctx.update.message.web_app_data) {
-    const data = JSON.parse(ctx.update.message.web_app_data);
-    console.log(`Received data from Mini App:\n ${data}`); // Replace "yourData" with the actual key
-    // Handle the data here
-  }
-});
+// bot.on("message", (ctx) => {
+//   console.log(ctx);
+//   if (ctx.update.message.web_app_data) {
+//     const data = JSON.parse(ctx.update.message.web_app_data);
+//     console.log(`Received data from Mini App:\n ${data}`); // Replace "yourData" with the actual key
+//     // Handle the data here
+//   }
+// });
 
 // // Mini App initialization (replace with your details)
 // const miniApp = new TelegramWebApp({
@@ -131,12 +142,12 @@ app.get("/user/:id", async (req, res) => {
 app.patch("/user/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const updateDetails = req.body
+    const updateDetails = req.body;
     // console.log(updateDetails)
 
-    const user = await User.findOne({telegram_id:id})
-    user.tasks = {...user.tasks, ...updateDetails}
-    await user.save()
+    const user = await User.findOne({ telegram_id: id });
+    user.tasks = { ...user.tasks, ...updateDetails };
+    await user.save();
 
     res.status(200).json({ success: true });
   } catch (error) {
