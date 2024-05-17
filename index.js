@@ -4,7 +4,21 @@ require("dotenv/config");
 const mongoose = require("mongoose");
 const express = require("express");
 const User = require("./model/userModel");
+const bodyParser = require("body-parser");
+const cors = require("cors");
 const app = express();
+
+app.use(
+  cors({
+    origin: "*",
+  })
+);
+
+// Parse URL-encoded bodies (deprecated in Express v4.16+)
+app.use(bodyParser.urlencoded({ extended: false }));
+
+// Parse JSON bodies
+app.use(express.json());
 
 app.get("/", (req, res) => {
   res.send("Hello world");
@@ -102,7 +116,7 @@ app.get("/", (req, res) => {
   res.send("Hello-world");
 });
 
-app.get("/user/id", async (req, res) => {
+app.get("/user/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -114,13 +128,16 @@ app.get("/user/id", async (req, res) => {
   }
 });
 
-app.patch("/user/id", async (req, res) => {
+app.patch("/user/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updateDetails = req.body
+    // console.log(updateDetails)
 
-    await User.updateOne({ telegram_id: id }, { $set: updateDetails });
-    
+    const user = await User.findOne({telegram_id:id})
+    user.tasks = {...user.tasks, ...updateDetails}
+    await user.save()
+
     res.status(200).json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, error });
